@@ -5,3 +5,4 @@ history.txt
 *.swo
 *~
 .idea
+Cargo.lock
