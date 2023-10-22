@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 extern crate nom;
 
 pub mod evaluator;

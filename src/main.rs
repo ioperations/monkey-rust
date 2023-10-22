@@ -1,6 +1,4 @@
 extern crate monkey_lib;
-#[macro_use]
-extern crate clap;
 extern crate nom;
 
 use monkey_lib::evaluator::*;

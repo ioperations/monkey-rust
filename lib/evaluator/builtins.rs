@@ -31,7 +31,7 @@ fn add_builtin(name: &str, param_num: usize, func: BuiltinFunction) -> (Ident, O
 }
 
 fn bprint_fn(args: Vec<Object>) -> Result<Object, String> {
-    match args.get(0) {
+    match args.first() {
         Some(Object::String(t)) => {
             println!("{}", t);
             Ok(Object::Null)
@@ -45,7 +45,7 @@ fn bprint_fn(args: Vec<Object>) -> Result<Object, String> {
 }
 
 fn blen_fn(args: Vec<Object>) -> Result<Object, String> {
-    match args.get(0) {
+    match args.first() {
         Some(Object::String(s)) => Ok(Object::Integer(s.len() as i64)),
         Some(Object::Array(arr)) => Ok(Object::Integer(arr.len() as i64)),
         _ => Err(String::from("invalid arguments for len")),

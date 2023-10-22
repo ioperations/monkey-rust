@@ -5,20 +5,31 @@ pub enum Command {
     Noop,
 }
 
-pub fn read_command() -> Command {
-    let matches = clap_app!(monkey =>
-        (version: "0.5.0")
-        (author: "Jérôme Mahuet <jerome.mahuet@gmail.com>")
-        (about: "The Monkey programming language")
-        (@setting ArgRequiredElseHelp)
-        (@arg src: -s --src +takes_value "Path of the source file")
-        (@arg run: -r --run +takes_value "Code you want to run inline")
-    )
-    .get_matches();
+use clap::Parser;
 
-    let src_path = matches.value_of("src").map(|s| s.to_string());
-    let run_string = matches.value_of("run").map(|s| s.to_string());
-    match (src_path, run_string) {
+/// Simple program to greet a person
+#[derive(Parser, Debug)]
+#[command(author = "Jérôme Mahuet <jerome.mahuet@gmail.com>")]
+#[command(version = "0.5.0")]
+#[command(name = "git")]
+#[command(about = "A fictional versioning CLI", long_about = None)]
+struct Args {
+    /// Name of the person to greet
+    #[arg(short, long)]
+    src: String,
+
+    /// Number of times to greet
+    #[arg(short, long)]
+    run: String,
+}
+
+pub fn read_command() -> Command {
+    let args = Args::parse();
+
+    let src_path = args.src;
+    let run_string = args.run;
+
+    match (Some(src_path), Some(run_string)) {
         (Some(s), _) => Command::FileRead(s),
         (_, Some(s)) => Command::RunInlineCode(s),
         _ => Command::Noop,

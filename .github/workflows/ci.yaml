@@ -1,0 +1,36 @@
+name: monkey-lang 
+
+# Run this workflow every time a new commit pushed to your repository
+on:
+  push:
+  pull_request:
+  schedule: [cron: "40 1 * * *"]
+
+env:
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  cargo-test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    container: ${{ matrix.container }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: cargo test --benches -j$(nproc)
+
+  clippy-test:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    container: ${{ matrix.container }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - run: |
+          cargo clippy
