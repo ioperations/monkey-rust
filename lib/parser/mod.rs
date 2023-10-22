@@ -120,20 +120,28 @@ fn parse_expr(input: Tokens) -> IResult<Tokens, Expr> {
 }
 
 fn parse_stmt(input: Tokens) -> IResult<Tokens, Stmt> {
-    alt((parse_let_stmt, parse_return_stmt, parse_expr_stmt))(input)
+    map(
+        rule!( (#parse_let_stmt | #parse_return_stmt | #parse_expr_stmt)),
+        |o| o,
+    )(input)
+    // alt((parse_let_stmt, parse_return_stmt, parse_expr_stmt))(input)
 }
 
 fn parse_let_stmt(input: Tokens) -> IResult<Tokens, Stmt> {
     map(
-        tuple((
-            let_tag,
-            parse_ident,
-            assign_tag,
-            parse_expr,
-            opt(semicolon_tag),
-        )),
+        rule!(Token::Let ~ #parse_ident ~ Token::Assign ~ #parse_expr ~ Token::SemiColon?),
         |(_, ident, _, expr, _)| Stmt::LetStmt(ident, expr),
     )(input)
+    // map(
+    //     tuple((
+    //         let_tag,
+    //         parse_ident,
+    //         assign_tag,
+    //         parse_expr,
+    //         opt(semicolon_tag),
+    //     )),
+    //     |(_, ident, _, expr, _)| Stmt::LetStmt(ident, expr),
+    // )(input)
 }
 
 fn parse_return_stmt(input: Tokens) -> IResult<Tokens, Stmt> {
