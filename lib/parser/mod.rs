@@ -1,9 +1,6 @@
 use nom::*;
 
 pub mod ast;
-use crate::lexer::token::Token::{
-    Function, If, LBrace, LBracket, LParen, RBrace, RBracket, RParen,
-};
 use crate::lexer::token::*;
 use crate::parser::ast::*;
 use nom::branch::*;
@@ -42,13 +39,6 @@ macro_rules! rule {
     }
 }
 
-macro_rules! tag_token (
-    ($func_name:ident, $tag: expr) => (
-        fn $func_name(tokens: Tokens) -> IResult<Tokens, Tokens> {
-            verify(take(1usize), |t: &Tokens| t.tok[0] == $tag)(tokens)
-        }
-    )
-  );
 fn parse_literal(input: Tokens) -> IResult<Tokens, Literal> {
     let (i1, t1) = take(1usize)(input)?;
     if t1.tok.is_empty() {
@@ -73,25 +63,6 @@ fn parse_ident(input: Tokens) -> IResult<Tokens, Ident> {
         }
     }
 }
-tag_token!(let_tag, Token::Let);
-tag_token!(assign_tag, Token::Assign);
-tag_token!(semicolon_tag, Token::SemiColon);
-tag_token!(return_tag, Token::Return);
-tag_token!(lbrace_tag, Token::LBrace);
-tag_token!(rbrace_tag, Token::RBrace);
-tag_token!(lparen_tag, Token::LParen);
-tag_token!(rparen_tag, Token::RParen);
-tag_token!(lbracket_tag, Token::LBracket);
-tag_token!(rbracket_tag, Token::RBracket);
-tag_token!(comma_tag, Token::Comma);
-tag_token!(colon_tag, Token::Colon);
-tag_token!(plus_tag, Token::Plus);
-tag_token!(minus_tag, Token::Minus);
-tag_token!(not_tag, Token::Not);
-tag_token!(if_tag, Token::If);
-tag_token!(else_tag, Token::Else);
-tag_token!(function_tag, Token::Function);
-tag_token!(eof_tag, Token::EOF);
 
 fn infix_op(t: &Token) -> (Precedence, Option<Infix>) {
     match *t {
@@ -112,7 +83,7 @@ fn infix_op(t: &Token) -> (Precedence, Option<Infix>) {
 }
 
 fn parse_program(input: Tokens) -> IResult<Tokens, Program> {
-    terminated(many0(parse_stmt), eof_tag)(input)
+    map(rule!(#parse_stmt* ~ Token::EOF), |(v, _)| v)(input)
 }
 
 fn parse_expr(input: Tokens) -> IResult<Tokens, Expr> {
@@ -121,10 +92,11 @@ fn parse_expr(input: Tokens) -> IResult<Tokens, Expr> {
 
 fn parse_stmt(input: Tokens) -> IResult<Tokens, Stmt> {
     map(
-        rule!( (#parse_let_stmt | #parse_return_stmt | #parse_expr_stmt)),
+        rule!( (#parse_let_stmt : "`Let statement`"
+        | #parse_return_stmt : "`return statement`"
+        | #parse_expr_stmt: "`exprestion statement`")),
         |o| o,
     )(input)
-    // alt((parse_let_stmt, parse_return_stmt, parse_expr_stmt))(input)
 }
 
 fn parse_let_stmt(input: Tokens) -> IResult<Tokens, Stmt> {
@@ -132,51 +104,42 @@ fn parse_let_stmt(input: Tokens) -> IResult<Tokens, Stmt> {
         rule!(Token::Let ~ #parse_ident ~ Token::Assign ~ #parse_expr ~ Token::SemiColon?),
         |(_, ident, _, expr, _)| Stmt::LetStmt(ident, expr),
     )(input)
-    // map(
-    //     tuple((
-    //         let_tag,
-    //         parse_ident,
-    //         assign_tag,
-    //         parse_expr,
-    //         opt(semicolon_tag),
-    //     )),
-    //     |(_, ident, _, expr, _)| Stmt::LetStmt(ident, expr),
-    // )(input)
 }
 
 fn parse_return_stmt(input: Tokens) -> IResult<Tokens, Stmt> {
     map(
-        delimited(return_tag, parse_expr, opt(semicolon_tag)),
-        Stmt::ReturnStmt,
+        rule!( Token::Return ~ #parse_expr ~ Token::SemiColon? ),
+        |(_, e, _)| Stmt::ReturnStmt(e),
     )(input)
 }
 
 fn parse_expr_stmt(input: Tokens) -> IResult<Tokens, Stmt> {
-    map(terminated(parse_expr, opt(semicolon_tag)), |expr| {
+    map(rule!(#parse_expr ~ Token::SemiColon?), |(expr, _)| {
         Stmt::ExprStmt(expr)
     })(input)
 }
 
 fn parse_block_stmt(input: Tokens) -> IResult<Tokens, Program> {
-    // let ret = delimited(lbrace_tag, many0(parse_stmt), rbrace_tag)(input);
-    map(rule!( LBrace ~ #parse_stmt* ~ RBrace), |o| o.1)(input)
+    map(rule!( Token::LBrace ~ #parse_stmt* ~ Token::RBrace), |o| {
+        o.1
+    })(input)
 }
 
 fn parse_atom_expr(input: Tokens) -> IResult<Tokens, Expr> {
     rule!(
-            #parse_lit_expr
-           | #parse_ident_expr
-           | #parse_prefix_expr
-           | #parse_paren_expr
-           | #parse_array_expr
-           | #parse_hash_expr
-           | #parse_if_expr
-           | #parse_fn_expr
+            #parse_lit_expr : "Literal Expr"
+           | #parse_ident_expr : "Ident Expr"
+           | #parse_prefix_expr : "Prefix Expr"
+           | #parse_paren_expr : "Paren Expr"
+           | #parse_array_expr : "Array Expr"
+           | #parse_hash_expr : "Hash Expr"
+           | #parse_if_expr : "If Expr"
+           | #parse_fn_expr : "Fn Expr"
     )(input)
 }
 
 fn parse_paren_expr(input: Tokens) -> IResult<Tokens, Expr> {
-    map(rule!( LParen ~ #parse_expr ~ RParen), |o| o.1)(input)
+    map(rule!( Token::LParen ~ #parse_expr ~ Token::RParen), |o| o.1)(input)
 }
 
 fn parse_lit_expr(input: Tokens) -> IResult<Tokens, Expr> {
@@ -186,17 +149,13 @@ fn parse_ident_expr(input: Tokens) -> IResult<Tokens, Expr> {
     map(parse_ident, Expr::IdentExpr)(input)
 }
 fn parse_comma_exprs(input: Tokens) -> IResult<Tokens, Expr> {
-    preceded(comma_tag, parse_expr)(input)
+    map(rule!( Token::Comma ~ #parse_expr), |(_, e)| e)(input)
 }
 fn parse_exprs(input: Tokens) -> IResult<Tokens, Vec<Expr>> {
     map(
         rule!(#parse_expr ~ #parse_comma_exprs*),
         |(first, second)| [&vec![first][..], &second[..]].concat(),
     )(input)
-    // map(
-    //     pair(parse_expr, many0(parse_comma_exprs)),
-    //     |(first, second)| [&vec![first][..], &second[..]].concat(),
-    // )(input)
 }
 fn empty_boxed_vec(input: Tokens) -> IResult<Tokens, Vec<Expr>> {
     Ok((input, vec![]))
@@ -204,29 +163,25 @@ fn empty_boxed_vec(input: Tokens) -> IResult<Tokens, Vec<Expr>> {
 
 fn parse_array_expr(input: Tokens) -> IResult<Tokens, Expr> {
     map(
-        rule!( LBracket ~ (#parse_exprs | #empty_boxed_vec) ~ RBracket),
+        rule!( Token::LBracket ~ (#parse_exprs | #empty_boxed_vec) ~ Token::RBracket),
         |o| Expr::ArrayExpr(o.1),
     )(input)
-    // map(
-    //     delimited(
-    //         lbracket_tag,
-    //         alt((parse_exprs, empty_boxed_vec)),
-    //         rbracket_tag,
-    //     ),
-    //     Expr::ArrayExpr,
-    // )(input)
 }
 
 fn parse_hash_pair(input: Tokens) -> IResult<Tokens, (Literal, Expr)> {
-    separated_pair(parse_literal, colon_tag, parse_expr)(input)
+    map(
+        rule!(#parse_literal~ Token::Colon ~ #parse_expr),
+        |(e, _, v)| (e, v),
+    )(input)
 }
+
 fn parse_hash_comma_expr(input: Tokens) -> IResult<Tokens, (Literal, Expr)> {
-    preceded(comma_tag, parse_hash_pair)(input)
+    map(rule!( Token::Comma ~ #parse_hash_pair), |(_, e)| e)(input)
 }
 
 fn parse_hash_pairs(input: Tokens) -> IResult<Tokens, Vec<(Literal, Expr)>> {
     map(
-        pair(parse_hash_pair, many0(parse_hash_comma_expr)),
+        rule!( #parse_hash_pair ~ #parse_hash_comma_expr*),
         |(first, second)| [&vec![first][..], &second[..]].concat(),
     )(input)
 }
@@ -235,13 +190,13 @@ fn empty_pairs(input: Tokens) -> IResult<Tokens, Vec<(Literal, Expr)>> {
 }
 fn parse_hash_expr(input: Tokens) -> IResult<Tokens, Expr> {
     map(
-        delimited(lbrace_tag, alt((parse_hash_pairs, empty_pairs)), rbrace_tag),
-        Expr::HashExpr,
+        rule!( Token::LBrace ~ ( #parse_hash_pairs | #empty_pairs ) ~ Token::RBrace ),
+        |(_, e, _)| Expr::HashExpr(e),
     )(input)
 }
 
 fn parse_prefix_expr(input: Tokens) -> IResult<Tokens, Expr> {
-    let (i1, t1) = alt((plus_tag, minus_tag, not_tag))(input)?;
+    let (i1, t1) = rule!(Token::Plus | Token::Minus | Token::Not)(input)?;
     if t1.tok.is_empty() {
         Err(Err::Error(error_position!(input, ErrorKind::Tag)))
     } else {
@@ -305,81 +260,62 @@ fn parse_infix_expr(input: Tokens, left: Expr) -> IResult<Tokens, Expr> {
 
 fn parse_call_expr(input: Tokens, fn_handle: Expr) -> IResult<Tokens, Expr> {
     map(
-        delimited(lparen_tag, alt((parse_exprs, empty_boxed_vec)), rparen_tag),
-        |e| Expr::CallExpr {
-            function: Box::new(fn_handle.clone()),
+        rule!( Token::LParen ~ ( #parse_exprs | #empty_boxed_vec ) ~ Token::RParen),
+        |(_, e, _)| Expr::CallExpr {
+            function: Box::new(fn_handle.clone()).clone(),
             arguments: e,
         },
     )(input)
 }
 
 fn parse_index_expr(input: Tokens, arr: Expr) -> IResult<Tokens, Expr> {
-    map(rule!(LBracket ~ #parse_expr ~ RBracket), |o| {
-        Expr::IndexExpr {
+    map(
+        rule!(Token::LBracket ~ #parse_expr ~ Token::RBracket),
+        |o| Expr::IndexExpr {
             array: Box::new(arr.clone()).clone(),
             index: Box::new(o.1),
-        }
-    })(input)
-    // map(delimited(lbracket_tag, parse_expr, rbracket_tag), |idx| {
-    //     Expr::IndexExpr {
-    //         array: Box::new(arr.clone()),
-    //         index: Box::new(idx),
-    //     }
-    // })(input)
+        },
+    )(input)
 }
 
 fn parse_if_expr(input: Tokens) -> IResult<Tokens, Expr> {
     map(
-        rule!( If ~ LParen ~ #parse_expr ~ RParen ~ #parse_block_stmt ~ #parse_else_expr ),
+        rule!( Token::If ~ Token::LParen ~ #parse_expr ~ Token::RParen ~ #parse_block_stmt ~ #parse_else_expr ),
         |(_, _, expr, _, c, a)| Expr::IfExpr {
             cond: Box::new(expr),
             consequence: c,
             alternative: a,
         },
     )(input)
-
-    // map(
-    //     tuple((
-    //         if_tag,
-    //         lparen_tag,
-    //         parse_expr,
-    //         rparen_tag,
-    //         parse_block_stmt,
-    //        parse_else_expr,
-    //    )),
-    //    |(_, _, expr, _, c, a)| Expr::IfExpr {
-    //        cond: Box::new(expr),
-    //        consequence: c,
-    //        alternative: a,
-    //     },
-    // )(input)
 }
 fn parse_else_expr(input: Tokens) -> IResult<Tokens, Option<Program>> {
-    opt(preceded(else_tag, parse_block_stmt))(input)
+    map(
+        rule!( ( Token::Else ~ #parse_block_stmt )?),
+        |(b)| match b {
+            Some(s) => Some(s.1),
+            None => None,
+        },
+    )(input)
 }
 fn empty_params(input: Tokens) -> IResult<Tokens, Vec<Ident>> {
     Ok((input, vec![]))
 }
 fn parse_fn_expr(input: Tokens) -> IResult<Tokens, Expr> {
     map(
-        rule!( Function ~ LParen ~ (#parse_params | #empty_params) ~ RParen ~ #parse_block_stmt),
+        rule!( Token::Function ~ Token::LParen ~ (#parse_params | #empty_params) ~ Token::RParen ~ #parse_block_stmt),
         |(_, _, p, _, b)| Expr::FnExpr { params: p, body: b },
     )(input)
-    //    map(
-    //        tuple((
-    //            function_tag,
-    //            lparen_tag,
-    //            alt((parse_params, empty_params)),
-    //            rparen_tag,
-    //            parse_block_stmt,
-    //        )),
-    //        |(_, _, p, _, b)| Expr::FnExpr { params: p, body: b },
-    //    )(input)
 }
 fn parse_params(input: Tokens) -> IResult<Tokens, Vec<Ident>> {
     map(
-        pair(parse_ident, many0(preceded(comma_tag, parse_ident))),
-        |(p, ps)| [&vec![p][..], &ps[..]].concat(),
+        rule!( #parse_ident ~  ( Token::Comma ~ #parse_ident)*),
+        |(p, ps)| {
+            [
+                &vec![p][..],
+                &ps.into_iter().map(|(_, t)| t).collect::<Vec<_>>()[..],
+            ]
+            .concat()
+        },
     )(input)
 }
 
