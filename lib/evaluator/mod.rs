@@ -250,7 +250,7 @@ impl Evaluator {
             let old_env = Rc::clone(&self.env);
             let mut new_env = Environment::new_with_outer(Rc::clone(f_env));
             let zipped = params.into_iter().zip(args);
-            for (_, (Ident(name), o)) in zipped.enumerate() {
+            for ((Ident(name), o)) in zipped {
                 new_env.set(&name, o);
             }
             self.env = Rc::new(RefCell::new(new_env));
@@ -723,10 +723,7 @@ mod tests {
             (input_beg.clone() + "let s = \"two\"; h[s]").as_bytes(),
             Object::Integer(2),
         );
-        compare(
-            (input_beg.clone() + "h[3]").as_bytes(),
-            Object::Integer(3),
-        );
+        compare((input_beg.clone() + "h[3]").as_bytes(), Object::Integer(3));
         compare(
             (input_beg.clone() + "h[2 + 2]").as_bytes(),
             Object::Integer(4),
@@ -739,10 +736,7 @@ mod tests {
             (input_beg.clone() + "h[5 < 1]").as_bytes(),
             Object::Boolean(false),
         );
-        compare(
-            (input_beg.clone() + "h[100]").as_bytes(),
-            Object::Null,
-        );
+        compare((input_beg.clone() + "h[100]").as_bytes(), Object::Null);
         compare(
             (input_beg.clone() + "h[[]]").as_bytes(),
             Object::Error("[] is not hashable".to_string()),
